@@ -1,0 +1,348 @@
+ Operation XML language reference manual
+ ========================================
+
+Document version: 0.0.1
+
+Structure:
+-----------
+The root element of the XML file have to be "temperature-tool-settings" and there
+are 3 sections that are being processed if available: substitutions, definitions
+and actions.
+
+1. Substitutions
+-----------------
+The substitutions can define either vendor substitutions or substitutions of the
+constant values. The type of substitution is being determined by it's type and the
+syntax of the element is:
+
+ <subst type="type" value="original-value">substitution-value</subst>
+
+e.g.:
+
+ <subst type="vendor" value="GenuineIntel">Intel</subst>
+
+defines that "GenuineIntel" can be referred to as "Intel" too. This definition also
+specifies it's a vendor type so when it's being read from the CPUID the value is
+being converted to "Intel" for further reference. Likewise:
+
+ <subst type="const" value="REGISTER">0x111</subst>
+
+allows you to use keyword "REGISTER" in the function or action XML block to represent
+value 0x111. The keyword will be converted into it's numeric equivalent once it's
+required.
+
+2. Definitions
+---------------
+The definitions block can define several definitions for various vendors as functions.
+The function to return the resulting temperature value have to carry name of "getTemp"
+with result type of int.
+
+The function can be defined by a name and returnType where returnType should be only
+"int" however "uint32_t" is supported as well.
+
+The functions themselves can read the data using the special accessor elements like
+dev or reg to define either device (only PCI devices are supported right now) or a
+register to be read from the CPU (MSR register), PCI device (that have to be assigned
+a variable using the dev element first) or from a CPUID.
+
+All the decimal values can be defined both in decimal notation and hexadecimal notation.
+For hexadecimal notation the "0x" prefix is required, e.g. 0x10 to define decimal number
+16 etc.
+
+The function elements can be: dev (PCI-only), reg, write-reg, op, flagIf, dump, reset,
+                              returnIf, setIf, return, call, conditionBlock
+
+2.1 Device element
+-------------------
+
+The device element (<dev>) is used to define the device and assign a handle to a device.
+Currently only PCI devices are being supported by this app and you have to compile
+the app with libpci support, i.e. pciutils and pciutils-devel packages have to be
+installed to allow this to work.
+
+The definition is as follows:
+
+<dev type="device-type" value="device-class, device-vendor-id, device-function">handle</dev>
+
+The handle returned can be used later by the <reg> element to read the PCI register. The
+device is being closed automatically when the function returns.
+
+2.2 Register element
+---------------------
+
+The register element (<reg>) is used to read the register information from the PCI device
+(previously assigned by <dev> element), CPUID or CPU (MSR) register.
+
+Type of the register read function can be one of following values: msr, cpuid, pci, pci-long,
+								   pci-word, pci-byte
+
+The "pci" type is the equivalent of "pci-long" (which is typically 4 bytes register). The
+"pci-word" defines the 2 bytes wide register and "pci-byte" defines one byte wide register.
+
+Syntax:
+<reg type="type" value="register-or-handle, register">value</reg>
+
+The register (for CPUID and/or MSR) or handle (if type contains "pci") will be accessed and
+the read value will be saved into the "value" local variable.
+
+Example usage:
+
+<reg type="pci-byte" value="handle, 0x111">value</reg>
+
+If you want to use substitution constant instead of the direct declaration it's supported too.
+Imagine you have the substitution from the section 1 defined in your substitutions section,
+i.e. you have "<subst type="const" value="REG">0x111</subst>". Now you can use the definition
+like:
+
+<reg type="pci-byte" value="handle, REG">value</reg>
+
+and the result will be the same as in the previous case (with 0x111).
+
+2.3 Arithmetical operations
+----------------------------
+
+The operations elements (<op>) is used to perform arithmetical operations on the data. It's
+the core of the whole system allowing the most important mechanisms for calculating the
+temperature from the registers since the values read are *never* the raw temperature data
+values.
+
+The syntax is:
+
+<op type="type" value="sourceValue, arithmeticFunctionArgument">destinationValue</op>
+
+where type can be one of following and the following formulas apply:
+
+(note that "arithmeticFunctionArgument" is abbreated as arg, "sourceValue" as src and
+"destinationValue" as dest)
+
+type      => operation
+-------------------------
+and       => (dest = (src & arg))
+or        => (dest = (src | arg))
+eq        => (dest = (src == arg))
+neq       => (dest = (src != arg))
+greater   => (dest = (dest > arg))
+lower     => (dest = (dest < arg))
+shr       => (dest = (dest >> arg))
+shl       => (dest = (dest << arg))
+add       => (dest = (dest + arg))
+subtract  => (dest = (dest - arg))
+multiply  => (dest = (dest * arg))
+divide    => (dest = (dest / arg))
+
+Also inversions (~x) are allowed to unset bits, e.g.
+
+... x = 0 ...
+<op type="and" value="x, 1">
+... x = 1 ...
+<op type="and" value="x, ~1">
+... x = 0 ...
+
+2.4 Writing to the registers
+-----------------------------
+
+The <write-reg> element is designed for writing to the registers of the PCI device for
+the purposes it's needed (like for purpose of AMD K8 board). The types of pci, pci-long,
+pci-word and pci-byte are supported as well as for the PCI register read using the <reg>
+element.
+
+The syntax is:
+
+<write-reg type="type" value="handle, REG">value</write-reg>
+
+For this element the value is not the value to be written to but the value to read the
+source data from to be written into the REG register of the PCI device defined by handle.
+
+2.5 Conditional flag
+---------------------
+
+The system allows you to set the flag conditionally based on the input data using the
+<flagIf> element. The expression in there is being evaluated and the flag named flagName
+is being set if applicable.
+
+Syntax:
+
+<flagIf type="type" value="sourceValue, arithmeticFunctionArgument">flagName</flagIf>
+
+The definition of type, sourceValue and arithmeticFunctionArgument is the same as for
+arithmetic operations defined in section 2.3. If the value is bigger than 0 the flag
+flagName is being set otherwise nothing is being done.
+
+2.6 Conditional return
+-----------------------
+
+If you want to return from the function under some conditions (e.g. a flag is set) you
+may use the <returnIf> element. The condition check part have the same syntax and
+definition as the one in arithmetic operations section (section 2.3) and the returnValue
+is being returned as a return value is this is being met.
+
+<returnIf type="type" value="sourceValue, arithmeticFunctionArgument">returnValue</returnIf>
+
+2.7 Conditional set
+--------------------
+
+This value is almost the same as conditional flag except instead of flagName the variableName
+with a value should be defined.
+
+<setIf type="type" value="sourceValue, arithmeticFunctionArgument">value=10</setIf>
+
+This sets the local variable value to 10 if it's being met.
+
+2.8 Reset element
+------------------
+
+If you're running a lot of arithmetical operations you most likely have many flags and variables
+set. Since it requires some memory to do those operations you may need to reset those flags or
+variables and deallocate the memory used by them. This can be done by the <reset> element.
+
+Syntax:
+
+<reset type="type" value="value" />
+
+The type can be either flags, uint64 or int which determines what kind of variable you need to
+reset. For value you can use either the comma-separated list of given type variables to be unset
+or you can use keyword "all" to unset all of them if you don't need them.
+
+2.9 Return element
+-------------------
+
+If you want to return some value from a function unconditionally you should use <return> element.
+Normally, every function should be using this element right before the function closing element.
+
+Syntax:
+
+<return value="value" />
+
+This returns the value from the function and terminates the function. The value is now being
+stored as the function return value global variable.
+
+2.10 Call element
+------------------
+
+If you want to get some data from the other function or print a variable (e.g. for debugging)
+you may use the <call> element with appropriate type value.
+
+Types supported: call, print
+
+Syntax:
+<call type="type" value="value-or-function-name">format-string-or-value-to-store-func-return</call>
+
+Call example:
+
+<call type="call" value="getValue">valueFromFunction</call>
+
+This saves the result of getValue function into the valueFromFunction local variable.
+
+Print example:
+
+<call type="print" value="value">Value is 0x%x</call>
+
+For print function call the format string is the same like for printf() C-language function.
+
+2.11 Condition block
+---------------------
+
+Simply put the <conditionBlock> element is an "if-element" with type and value equivalent to the
+arithmetic operations and if it's being evaluated as true, i.e. value is bigger than 0, the
+block is being processed. The block can contain every element as the entire function itself.
+
+The following example will run only when run is set to 1 (or flag run set) and if it enters
+the block it's reading the CPUID 0x00000000 (here it's defined in a decimal notation, i.e.
+decimal value 0) and stores the result into the ax variable. The arithmetic operation of
+ax & 0x20 is being saved into the haveMSR variable and this value is being returned from the
+function to identify it's having the MSR or not.
+
+...
+<conditionBlock type="eq" value="run, 1">
+	<reg type="cpuid" value="eax, 0">ax</reg>
+	<op type="and" value="ax, 0x20">haveMSR</op>
+	<return value="haveMSR" />
+</conditionBlock>
+...
+
+2.12 Dump element
+-------------------
+
+If you want to dump the information about the substitutions in the memory, variables, flags, function
+results or pci-devices you can use the <dump> element to dump those variables.
+
+Types supported: subst, vars, flags, function-results, pci-devices
+
+Syntax:
+
+<dump type="type" />
+
+For the valid pci-devices the BDF of the device being loaded and vendor/product ids are being printed.
+
+3. Actions
+----------
+
+If you got the temperature value you should define the action to be done under when some conditions are
+being met. This is being defined as a type and value of <action> element under the <actions>. The syntax
+is as follows:
+
+<action type="type" value="value">
+
+or:
+
+<action type="default" />
+
+where type can be either "value-exceeds" or "default". The "value-exceeds" type requires a value to be
+defined. When the temperature exceeds the value the action is being processed.
+
+Following actions elements are supported: op element (see section 2.3), sleep, set, execute
+
+3.1 Operations element
+-----------------------
+
+Please see section 2.3 since the definition is the same.
+
+3.2 Sleep element
+------------------
+
+Defines the sleep for defined number of seconds if the action is being met.
+
+Syntax:
+
+<sleep>time</time>
+
+Sleeps for time seconds.
+
+3.3 Set element
+----------------
+
+This is the element to set a local variable for the function.
+
+Syntax:
+
+<set>var = value</set>
+
+3.4 Execute element
+--------------------
+
+Executes the command and/or application.
+
+Syntax:
+
+<execute type="run-only" value="command" />
+<execute type="save-exit-code" value="command">variable</execute>
+
+The run-only type runs the command and waiting for return but doing nothing with the result
+it has from the command whereas "save-exit-code" type runs the command and then it's waiting
+until the command finishes to read the exit code. The exit code is being saved into the
+variable for further processing.
+
+3.5 Conditional return
+-----------------------
+
+Please see section 2.6 - it's almost the same but the return terminates this application here.
+
+3.6 Global variable initialization
+-----------------------------------
+
+For the actions there a special <init> element to initialize the global variable and treat
+the variable as global. It's declared as:
+
+<init>value=1</init>
+
+Documented by Michal Novotny <mignov@gmail.com>

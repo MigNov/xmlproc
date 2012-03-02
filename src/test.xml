@@ -1,0 +1,52 @@
+<operation-processor-script version="0.0.1">
+	<substitutions>
+		<subst name="GenuineIntel">Intel</subst>
+		<subst name="AuthenticAMD">AMD</subst>
+	</substitutions>
+	<definitions>
+		<function name="CPUGetVendor">
+			<function name="CPUGetVendor" returnType="char">
+			<!-- Get EDX part of CPUID output -->
+			<reg type="cpuid" value="edx, 0x0">cpuid</reg>
+			<op type="and" value="cpuid, 0xFF">cpuid_t5</op>
+			<op type="shr" value="cpuid, 0x8">cpuidtmp</op>
+			<op type="and" value="cpuidtmp, 0xFF">cpuid_t6</op>
+			<op type="shr" value="cpuid, 0x10">cpuidtmp</op>
+			<op type="and" value="cpuidtmp, 0xFF">cpuid_t7</op>
+			<op type="shr" value="cpuid, 0x18">cpuidtmp</op>
+			<op type="and" value="cpuidtmp, 0xFF">cpuid_t8</op>
+		
+			<!-- Get ECX part of CPUID output -->
+			<reg type="cpuid" value="ecx, 0x0">cpuid</reg>
+			<op type="and" value="cpuid, 0xFF">cpuid_t9</op>
+			<op type="shr" value="cpuid, 0x8">cpuidtmp</op>
+			<op type="and" value="cpuidtmp, 0xFF">cpuid_tA</op>
+			<op type="shr" value="cpuid, 0x10">cpuidtmp</op>
+			<op type="and" value="cpuidtmp, 0xFF">cpuid_tB</op>
+			<op type="shr" value="cpuid, 0x18">cpuidtmp</op>
+			<op type="and" value="cpuidtmp, 0xFF">cpuid_tC</op>
+
+			<!-- Get EBX part of CPUID output -->
+			<reg type="cpuid" value="ebx, 0x0">cpuid</reg>
+			<op type="and" value="cpuid, 0xFF">cpuid_t1</op>
+			<op type="shr" value="cpuid, 0x8">cpuidtmp</op>
+			<op type="and" value="cpuidtmp, 0xFF">cpuid_t2</op>
+			<op type="shr" value="cpuid, 0x10">cpuidtmp</op>
+			<op type="and" value="cpuidtmp, 0xFF">cpuid_t3</op>
+			<op type="shr" value="cpuid, 0x18">cpuidtmp</op>
+			<op type="and" value="cpuidtmp, 0xFF">cpuid_t4</op>
+
+			<!-- Format CPUID string from cpuid_t* to cpuid_t variable -->
+			<format type="string-and-free" value="cpuid_t">%c%c%c%c%c%c%c%c%c%c%c%c%c</format>
+			<return value="cpuid_t" />
+			</function>
+		</function>
+	</definitions>
+	<main-block returnType="int">
+		<execute type="function-char" value="CPUGetVendor">cpuvendor</execute>
+		<call type="print" value="cpuvendor">CPUVendor is %s</call>
+		<!--
+		<dump type="vars" />
+		-->
+	</main-block>
+</operation-processor-script>
