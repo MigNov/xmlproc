@@ -1,8 +1,13 @@
 #include "xml.h"
 
-int main()
+int main(int argc, char *argv[])
 {
-	processXml("./test.xml");
+	if (argc < 2) {
+		fprintf(stderr, "Syntax: %s <filename>\n", argv[0]);
+		return EXIT_FAILURE;
+	}
+
+	processXml(argv[1]);
 	return 0;
 }
 
