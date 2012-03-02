@@ -5,7 +5,7 @@ Document version: 0.0.1
 
 Structure:
 -----------
-The root element of the XML file have to be "temperature-tool-settings" and there
+The root element of the XML file have to be "operation-processor-script" and there
 are 3 sections that are being processed if available: substitutions, definitions
 and actions.
 
@@ -273,76 +273,5 @@ Syntax:
 <dump type="type" />
 
 For the valid pci-devices the BDF of the device being loaded and vendor/product ids are being printed.
-
-3. Actions
-----------
-
-If you got the temperature value you should define the action to be done under when some conditions are
-being met. This is being defined as a type and value of <action> element under the <actions>. The syntax
-is as follows:
-
-<action type="type" value="value">
-
-or:
-
-<action type="default" />
-
-where type can be either "value-exceeds" or "default". The "value-exceeds" type requires a value to be
-defined. When the temperature exceeds the value the action is being processed.
-
-Following actions elements are supported: op element (see section 2.3), sleep, set, execute
-
-3.1 Operations element
------------------------
-
-Please see section 2.3 since the definition is the same.
-
-3.2 Sleep element
-------------------
-
-Defines the sleep for defined number of seconds if the action is being met.
-
-Syntax:
-
-<sleep>time</time>
-
-Sleeps for time seconds.
-
-3.3 Set element
-----------------
-
-This is the element to set a local variable for the function.
-
-Syntax:
-
-<set>var = value</set>
-
-3.4 Execute element
---------------------
-
-Executes the command and/or application.
-
-Syntax:
-
-<execute type="run-only" value="command" />
-<execute type="save-exit-code" value="command">variable</execute>
-
-The run-only type runs the command and waiting for return but doing nothing with the result
-it has from the command whereas "save-exit-code" type runs the command and then it's waiting
-until the command finishes to read the exit code. The exit code is being saved into the
-variable for further processing.
-
-3.5 Conditional return
------------------------
-
-Please see section 2.6 - it's almost the same but the return terminates this application here.
-
-3.6 Global variable initialization
------------------------------------
-
-For the actions there a special <init> element to initialize the global variable and treat
-the variable as global. It's declared as:
-
-<init>value=1</init>
 
 Documented by Michal Novotny <mignov@gmail.com>
